@@ -1,5 +1,9 @@
 # rs-async-utf8-decoder
 
+[![Audit](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml)
+[![Build](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml)
+[![Test](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/test.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/test.yml)
+
 Incremental UTF8 decoder which convert [`AsyncRead`][] into [`Stream`][] of [futures-rs][].
 
 [`AsyncRead`]: https://docs.rs/futures/0.3.13/futures/prelude/trait.AsyncRead.html 
