@@ -63,7 +63,11 @@ where
         let buf = this.buf;
         let (decoded, remains) = ready!(decode_next(reader, cx, buf, *this.remains))?;
         *this.remains = remains;
-        Poll::Ready(Some(Ok(decoded)))
+        if decoded.is_empty() {
+            Poll::Pending
+        } else {
+            Poll::Ready(Some(Ok(decoded)))
+        }
     }
 }
 
@@ -130,11 +134,14 @@ where
 mod tests {
     use super::*;
     use anyhow::Result;
+    use async_std::future::timeout;
     use async_std::io::Cursor;
     use async_std::prelude::*;
+    use std::time::Duration;
 
     #[async_std::test]
     async fn decoder_ok() -> Result<()> {
+        let dur = Duration::from_millis(10);
         let cur = Cursor::new(Vec::new());
         let mut decoder = Utf8Decoder::new(cur);
 
@@ -148,29 +155,25 @@ mod tests {
 
         // Decode full
         append(decoder.get_mut(), &vec![240, 159, 146, 150]).await?;
-        let decoded = decoder.next().await.unwrap()?;
+        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
         assert_eq!("💖", decoded);
 
         // Decode half
         append(decoder.get_mut(), &vec![240, 159]).await?;
-        let decoded = decoder.next().await.unwrap()?;
-        assert_eq!("", decoded);
+        assert!(timeout(dur, decoder.next()).await.is_err());
         append(decoder.get_mut(), &vec![146, 150]).await?;
-        let decoded = decoder.next().await.unwrap()?;
+        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
         assert_eq!("💖", decoded);
 
         // Decode char
         append(decoder.get_mut(), &vec![240]).await?;
-        let decoded = decoder.next().await.unwrap()?;
-        assert_eq!("", decoded);
+        assert!(timeout(dur, decoder.next()).await.is_err());
         append(decoder.get_mut(), &vec![159]).await?;
-        let decoded = decoder.next().await.unwrap()?;
-        assert_eq!("", decoded);
+        assert!(timeout(dur, decoder.next()).await.is_err());
         append(decoder.get_mut(), &vec![146]).await?;
-        let decoded = decoder.next().await.unwrap()?;
-        assert_eq!("", decoded);
+        assert!(timeout(dur, decoder.next()).await.is_err());
         append(decoder.get_mut(), &vec![150]).await?;
-        let decoded = decoder.next().await.unwrap()?;
+        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
         assert_eq!("💖", decoded);
 
         // Decode lot
@@ -182,7 +185,7 @@ mod tests {
             ],
         )
         .await?;
-        let decoded = decoder.next().await.unwrap()?;
+        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
         assert_eq!("💖💖💖💖💖", decoded);
 
         Ok(())
