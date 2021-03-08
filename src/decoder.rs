@@ -174,13 +174,14 @@ mod tests {
         assert_eq!("💖", decoded);
 
         // Decode lot
-        append(decoder.get_mut(), &vec![
-            240, 159, 146, 150,
-            240, 159, 146, 150,
-            240, 159, 146, 150,
-            240, 159, 146, 150,
-            240, 159, 146, 150,
-        ]).await?;
+        append(
+            decoder.get_mut(),
+            &vec![
+                240, 159, 146, 150, 240, 159, 146, 150, 240, 159, 146, 150, 240, 159, 146, 150,
+                240, 159, 146, 150,
+            ],
+        )
+        .await?;
         let decoded = decoder.next().await.unwrap()?;
         assert_eq!("💖💖💖💖💖", decoded);
 
