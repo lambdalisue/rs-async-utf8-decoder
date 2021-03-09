@@ -1,4 +1,4 @@
-# rs-async-utf8-decoder
+# async-utf8-decoder
 
 [![Audit](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml)
 [![Build](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml)
@@ -13,46 +13,63 @@ Incremental UTF8 decoder which convert [`AsyncRead`][] into [`Stream`][] of [fut
 ## Example
 
 ```rust
+use anyhow::Result;
 use async_std::io::Cursor;
+use async_std::future::timeout;
+use async_std::prelude::*;
+use std::time::Duration;
 use async_utf8_decoder::Utf8Decoder;
 
-let cur = Cursor::new(Vec::new());
-let mut decoder = Utf8Decoder::new(cur);
+async fn test() -> Result<()> {
+    let dur = Duration::from_millis(10);
+    let cur = Cursor::new(Vec::new());
+    let mut decoder = Utf8Decoder::new(cur);
 
-async fn append(cursor: &mut Cursor<Vec<u8>>, data: &[u8]) -> Result<()> {
-    let p = cursor.position();
-    cursor.set_position(cursor.get_ref().len() as u64);
-    cursor.write(data).await?;
-    cursor.set_position(p);
+    async fn append(cursor: &mut Cursor<Vec<u8>>, data: &[u8]) -> Result<()> {
+        let p = cursor.position();
+        cursor.set_position(cursor.get_ref().len() as u64);
+        cursor.write(data).await?;
+        cursor.set_position(p);
+        Ok(())
+    }
+
+    // Decode full
+    append(decoder.get_mut(), &vec![240, 159, 146, 150]).await?;
+    let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
+    assert_eq!("💖", decoded);
+
+    // Decode half
+    append(decoder.get_mut(), &vec![240, 159]).await?;
+    assert!(timeout(dur, decoder.next()).await.is_err());
+    append(decoder.get_mut(), &vec![146, 150]).await?;
+    let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
+    assert_eq!("💖", decoded);
+
+    // Decode char
+    append(decoder.get_mut(), &vec![240]).await?;
+    assert!(timeout(dur, decoder.next()).await.is_err());
+    append(decoder.get_mut(), &vec![159]).await?;
+    assert!(timeout(dur, decoder.next()).await.is_err());
+    append(decoder.get_mut(), &vec![146]).await?;
+    assert!(timeout(dur, decoder.next()).await.is_err());
+    append(decoder.get_mut(), &vec![150]).await?;
+    let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
+    assert_eq!("💖", decoded);
+
+    // Decode lot
+    append(
+        decoder.get_mut(),
+        &vec![
+            240, 159, 146, 150, 240, 159, 146, 150, 240, 159, 146, 150, 240, 159, 146, 150,
+            240, 159, 146, 150,
+        ],
+    )
+    .await?;
+    let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
+    assert_eq!("💖💖💖💖💖", decoded);
+
     Ok(())
 }
-
-// Decode full
-append(decoder.get_mut(), &vec![240, 159, 146, 150]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("💖", decoded);
-
-// Decode half
-append(decoder.get_mut(), &vec![240, 159]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("", decoded);
-append(decoder.get_mut(), &vec![146, 150]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("💖", decoded);
-
-// Decode char
-append(decoder.get_mut(), &vec![240]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("", decoded);
-append(decoder.get_mut(), &vec![159]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("", decoded);
-append(decoder.get_mut(), &vec![146]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("", decoded);
-append(decoder.get_mut(), &vec![150]).await?;
-let decoded = decoder.next().await.unwrap()?;
-assert_eq!("💖", decoded);
 ```
 
 ## License
