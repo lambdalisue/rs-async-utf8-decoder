@@ -8,6 +8,9 @@ version = "0.1.0"
 authors = ["Alisue <lambdalisue@hashnote.net>"]
 edition = "2018"
 license-file = "LICENSE"
+exclude = [
+    ".github/*",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
