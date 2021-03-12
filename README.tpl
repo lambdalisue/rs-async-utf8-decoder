@@ -5,34 +5,9 @@
 [![Test](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/test.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/test.yml)
 [![Audit](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml)
 
-# async-utf8-decoder
+# {{crate}}
 
-## Asynchronous and incremental UTF-8 decoder
-
-`async-utf8-decoder` crate provides `Utf8Decoder` which allows to convert any object which
-implements `AsyncRead` trait into a string stream which implements `Stream` trait.
-
-### Example
-
-```rust
-use futures::io;
-use futures::channel::mpsc;
-use async_utf8_decoder::Utf8Decoder;
-
-let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
-let mut decoder = Utf8Decoder::new(rx.into_async_read());
-
-tx.send(Ok(vec![240])).await?;
-assert!(timeout(decoder.next()).await.is_err());
-tx.send(Ok(vec![159])).await?;
-assert!(timeout(decoder.next()).await.is_err());
-tx.send(Ok(vec![146])).await?;
-assert!(timeout(decoder.next()).await.is_err());
-tx.send(Ok(vec![150])).await?;
-assert_eq!("💖", timeout(decoder.next()).await?.unwrap()?);
-assert!(timeout(decoder.next()).await.is_err());
-```
-
+{{readme}}
 
 # License
 
