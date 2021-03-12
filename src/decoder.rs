@@ -6,6 +6,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 const DEFAULT_BUF_SIZE: usize = 8 * 1024;
+const MINIMUM_BUF_SIZE: usize = 4; // Maximum utf-8 character byte length
 
 pub type Result<T> = std::result::Result<T, DecodeError>;
 
@@ -26,6 +27,12 @@ impl<R> Utf8Decoder<R> {
 
     /// Create a new incremental UTF-8 decoder from `reader` with specified capacity
     pub fn with_capacity(capacity: usize, reader: R) -> Self {
+        debug_assert!(
+            capacity >= MINIMUM_BUF_SIZE,
+            "capacity must be at least {} but {} is specified",
+            MINIMUM_BUF_SIZE,
+            capacity,
+        );
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
             buffer.set_len(capacity);
@@ -89,8 +96,8 @@ where
 {
     debug_assert!(buf.len() > s);
     let n = ready!(reader.poll_read(cx, &mut buf[s..]))?;
-    let e = s + n; //
-    debug_assert!(buf.len() > e);
+    let e = s + n;
+    debug_assert!(buf.len() >= e);
     let result = match std::str::from_utf8(&buf[..e]) {
         Ok(decoded) => Ok((decoded.to_string(), 0)),
         Err(err) => match err.error_len() {
@@ -280,6 +287,38 @@ mod tests {
             "\u{0024}\u{00A2}\u{0939}\u{10348}",
             timeout(decoder.next()).await?.unwrap()?
         );
+        assert!(timeout(decoder.next()).await.is_err());
+
+        Ok(())
+    }
+
+    #[async_test]
+    async fn decoder_decode_ok_with_minimum_capacity() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::with_capacity(MINIMUM_BUF_SIZE, rx.into_async_read());
+
+        // Complete
+        tx.send(Ok(vec![
+            0x24, 0xC2, 0xA2, 0xE0, 0xA4, 0xB9, 0xF0, 0x90, 0x8D, 0x88,
+        ]))
+        .await?;
+        tx.send(Ok(vec![
+            0x24, 0xC2, 0xA2, 0xE0, 0xA4, 0xB9, 0xF0, 0x90, 0x8D, 0x88,
+        ]))
+        .await?;
+        tx.send(Ok(vec![
+            0x24, 0xC2, 0xA2, 0xE0, 0xA4, 0xB9, 0xF0, 0x90, 0x8D, 0x88,
+        ]))
+        .await?;
+        assert_eq!("\u{0024}\u{00A2}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{0939}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{10348}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{0024}\u{00A2}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{0939}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{10348}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{0024}\u{00A2}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{0939}", timeout(decoder.next()).await?.unwrap()?);
+        assert_eq!("\u{10348}", timeout(decoder.next()).await?.unwrap()?);
         assert!(timeout(decoder.next()).await.is_err());
 
         Ok(())
