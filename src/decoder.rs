@@ -19,10 +19,12 @@ pin_project! {
 }
 
 impl<R> Utf8Decoder<R> {
+    /// Create a new incremental UTF-8 decoder from `reader`
     pub fn new(reader: R) -> Self {
         Utf8Decoder::with_capacity(DEFAULT_BUF_SIZE, reader)
     }
 
+    /// Create a new incremental UTF-8 decoder from `reader` with specified capacity
     pub fn with_capacity(capacity: usize, reader: R) -> Self {
         unsafe {
             let mut buffer = Vec::with_capacity(capacity);
@@ -35,14 +37,19 @@ impl<R> Utf8Decoder<R> {
         }
     }
 
+    /// Consumes this decoder, returning the underlying reader.
     pub fn into_inner(self) -> R {
         self.reader
     }
 
+    /// Acquires a reference to the underlying reader that this
+    /// decoder is pulling from.
     pub fn get_ref(&self) -> &R {
         &self.reader
     }
 
+    /// Acquires a mutable reference to the underlying reader that
+    /// this decoder is pulling from.
     pub fn get_mut(&mut self) -> &mut R {
         &mut self.reader
     }
