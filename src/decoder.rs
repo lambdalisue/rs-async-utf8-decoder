@@ -156,6 +156,24 @@ mod tests {
     }
 
     #[async_test]
+    async fn decoder_decode_demo() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        tx.send(Ok(vec![240])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![159])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![146])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![150])).await?;
+        assert_eq!("💖", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        Ok(())
+    }
+
+    #[async_test]
     async fn decoder_decode_1byte_character() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
