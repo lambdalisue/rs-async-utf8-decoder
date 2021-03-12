@@ -140,60 +140,129 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
-    use async_std::future::timeout;
-    use async_std::io::Cursor;
-    use async_std::prelude::*;
-    use std::time::Duration;
+    use anyhow::{anyhow, Result};
+    use futures::channel::mpsc;
+    use futures::io;
+    use futures::prelude::*;
+    use futures_await_test::async_test;
 
-    #[async_std::test]
-    async fn decoder_ok() -> Result<()> {
-        let dur = Duration::from_millis(10);
-        let cur = Cursor::new(Vec::new());
-        let mut decoder = Utf8Decoder::new(cur);
-
-        async fn append(cursor: &mut Cursor<Vec<u8>>, data: &[u8]) -> Result<()> {
-            let p = cursor.position();
-            cursor.set_position(cursor.get_ref().len() as u64);
-            cursor.write(data).await?;
-            cursor.set_position(p);
-            Ok(())
+    async fn timeout<T>(future: impl Future<Output = T> + Unpin) -> Result<T> {
+        let mut future = future.fuse();
+        let mut sleep = futures_timer::Delay::new(std::time::Duration::from_millis(100)).fuse();
+        futures::select! {
+            r = future => Ok(r),
+            _ = sleep => Err(anyhow!("Timeout")),
         }
+    }
 
-        // Decode full
-        append(decoder.get_mut(), &vec![240, 159, 146, 150]).await?;
-        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
-        assert_eq!("💖", decoded);
+    #[async_test]
+    async fn decoder_decode_1byte_character() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
 
-        // Decode half
-        append(decoder.get_mut(), &vec![240, 159]).await?;
-        assert!(timeout(dur, decoder.next()).await.is_err());
-        append(decoder.get_mut(), &vec![146, 150]).await?;
-        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
-        assert_eq!("💖", decoded);
+        tx.send(Ok(vec![0x24])).await?;
+        assert_eq!("\u{0024}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
 
-        // Decode char
-        append(decoder.get_mut(), &vec![240]).await?;
-        assert!(timeout(dur, decoder.next()).await.is_err());
-        append(decoder.get_mut(), &vec![159]).await?;
-        assert!(timeout(dur, decoder.next()).await.is_err());
-        append(decoder.get_mut(), &vec![146]).await?;
-        assert!(timeout(dur, decoder.next()).await.is_err());
-        append(decoder.get_mut(), &vec![150]).await?;
-        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
-        assert_eq!("💖", decoded);
+        Ok(())
+    }
 
-        // Decode lot
-        append(
-            decoder.get_mut(),
-            &vec![
-                240, 159, 146, 150, 240, 159, 146, 150, 240, 159, 146, 150, 240, 159, 146, 150,
-                240, 159, 146, 150,
-            ],
-        )
+    #[async_test]
+    async fn decoder_decode_2byte_character() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        // Complete
+        tx.send(Ok(vec![0xC2, 0xA2])).await?;
+        assert_eq!("\u{00A2}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        // Incremental
+        tx.send(Ok(vec![0xC2])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![0xA2])).await?;
+        assert_eq!("\u{00A2}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        Ok(())
+    }
+
+    #[async_test]
+    async fn decoder_decode_3byte_character() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        // Complete
+        tx.send(Ok(vec![0xE0, 0xA4, 0xB9])).await?;
+        assert_eq!("\u{0939}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        // Incremental
+        tx.send(Ok(vec![0xE0])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![0xA4])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![0xB9])).await?;
+        assert_eq!("\u{0939}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        Ok(())
+    }
+
+    #[async_test]
+    async fn decoder_decode_4byte_character() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        // Complete
+        tx.send(Ok(vec![0xF0, 0x90, 0x8D, 0x88])).await?;
+        assert_eq!("\u{10348}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        // Incremental
+        tx.send(Ok(vec![0xF0])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![0x90])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![0x8D])).await?;
+        assert!(timeout(decoder.next()).await.is_err());
+        tx.send(Ok(vec![0x88])).await?;
+        assert_eq!("\u{10348}", timeout(decoder.next()).await?.unwrap()?);
+        assert!(timeout(decoder.next()).await.is_err());
+
+        Ok(())
+    }
+
+    #[async_test]
+    async fn decoder_decode_ok() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        tx.send(Ok(vec![
+            0x24, 0xC2, 0xA2, 0xE0, 0xA4, 0xB9, 0xF0, 0x90, 0x8D, 0x88,
+        ]))
         .await?;
-        let decoded = timeout(dur, decoder.next()).await?.unwrap()?;
-        assert_eq!("💖💖💖💖💖", decoded);
+        tx.send(Ok(vec![
+            0x24, 0xC2, 0xA2, 0xE0, 0xA4, 0xB9, 0xF0, 0x90, 0x8D, 0x88,
+        ]))
+        .await?;
+        tx.send(Ok(vec![
+            0x24, 0xC2, 0xA2, 0xE0, 0xA4, 0xB9, 0xF0, 0x90, 0x8D, 0x88,
+        ]))
+        .await?;
+        assert_eq!(
+            "\u{0024}\u{00A2}\u{0939}\u{10348}",
+            timeout(decoder.next()).await?.unwrap()?
+        );
+        assert_eq!(
+            "\u{0024}\u{00A2}\u{0939}\u{10348}",
+            timeout(decoder.next()).await?.unwrap()?
+        );
+        assert_eq!(
+            "\u{0024}\u{00A2}\u{0939}\u{10348}",
+            timeout(decoder.next()).await?.unwrap()?
+        );
+        assert!(timeout(decoder.next()).await.is_err());
 
         Ok(())
     }
