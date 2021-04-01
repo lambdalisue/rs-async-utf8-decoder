@@ -78,6 +78,7 @@ where
         let (decoded, remains) = ready!(decode_next(reader, cx, buf, *this.remains))?;
         *this.remains = remains;
         if decoded.is_empty() {
+            cx.waker().wake_by_ref();
             Poll::Pending
         } else {
             Poll::Ready(Some(Ok(decoded)))
@@ -172,6 +173,21 @@ mod tests {
         tx.send(Ok(vec![150])).await?;
         assert_eq!("💖", timeout(decoder.next()).await?.unwrap()?);
         assert!(timeout(decoder.next()).await.is_err());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn decoder_decode_background() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        let consumer = async_std::task::spawn(async move { decoder.next().await });
+        tx.send(Ok(vec![240])).await?;
+        tx.send(Ok(vec![159])).await?;
+        tx.send(Ok(vec![146])).await?;
+        tx.send(Ok(vec![150])).await?;
+        assert_eq!("💖", timeout(consumer).await?.unwrap()?);
 
         Ok(())
     }
