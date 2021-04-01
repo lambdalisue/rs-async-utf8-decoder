@@ -78,6 +78,7 @@ where
         let (decoded, remains) = ready!(decode_next(reader, cx, buf, *this.remains))?;
         *this.remains = remains;
         if decoded.is_empty() {
+            cx.waker().wake_by_ref();
             Poll::Pending
         } else {
             Poll::Ready(Some(Ok(decoded)))
@@ -147,22 +148,18 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{anyhow, Result};
+    use anyhow::Result;
     use futures::channel::mpsc;
     use futures::io;
     use futures::prelude::*;
-    use futures_await_test::async_test;
 
     async fn timeout<T>(future: impl Future<Output = T> + Unpin) -> Result<T> {
-        let mut future = future.fuse();
-        let mut sleep = futures_timer::Delay::new(std::time::Duration::from_millis(100)).fuse();
-        futures::select! {
-            r = future => Ok(r),
-            _ = sleep => Err(anyhow!("Timeout")),
-        }
+        let result =
+            async_std::future::timeout(std::time::Duration::from_millis(100), future).await?;
+        Ok(result)
     }
 
-    #[async_test]
+    #[async_std::test]
     async fn decoder_decode_demo() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
@@ -180,7 +177,22 @@ mod tests {
         Ok(())
     }
 
-    #[async_test]
+    #[async_std::test]
+    async fn decoder_decode_background() -> Result<()> {
+        let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
+        let mut decoder = Utf8Decoder::new(rx.into_async_read());
+
+        let consumer = async_std::task::spawn(async move { decoder.next().await });
+        tx.send(Ok(vec![240])).await?;
+        tx.send(Ok(vec![159])).await?;
+        tx.send(Ok(vec![146])).await?;
+        tx.send(Ok(vec![150])).await?;
+        assert_eq!("💖", timeout(consumer).await?.unwrap()?);
+
+        Ok(())
+    }
+
+    #[async_std::test]
     async fn decoder_decode_1byte_character() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
@@ -192,7 +204,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_test]
+    #[async_std::test]
     async fn decoder_decode_2byte_character() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
@@ -212,7 +224,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_test]
+    #[async_std::test]
     async fn decoder_decode_3byte_character() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
@@ -234,7 +246,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_test]
+    #[async_std::test]
     async fn decoder_decode_4byte_character() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
@@ -258,7 +270,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_test]
+    #[async_std::test]
     async fn decoder_decode_ok() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::new(rx.into_async_read());
@@ -292,7 +304,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_test]
+    #[async_std::test]
     async fn decoder_decode_ok_with_minimum_capacity() -> Result<()> {
         let (mut tx, rx) = mpsc::unbounded::<io::Result<Vec<u8>>>();
         let mut decoder = Utf8Decoder::with_capacity(MINIMUM_BUF_SIZE, rx.into_async_read());
