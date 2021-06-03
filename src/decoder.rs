@@ -74,14 +74,23 @@ where
     ) -> Poll<Option<<Self as Stream>::Item>> {
         let this = self.project();
         let reader = this.reader;
+        let remains = *this.remains;
         let buf = this.buf;
-        let (decoded, remains) = ready!(decode_next(reader, cx, buf, *this.remains))?;
-        *this.remains = remains;
-        if decoded.is_empty() {
-            cx.waker().wake_by_ref();
-            Poll::Pending
+        if let Some(result) = ready!(decode_next(reader, cx, buf, remains)) {
+            let (decoded, remains) = result?;
+            *this.remains = remains;
+            if decoded.is_empty() {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            } else {
+                Poll::Ready(Some(Ok(decoded)))
+            }
+        } else if remains > 0 {
+            let remains = buf[..remains].to_vec();
+            let err = DecodeError::IncompleteUtf8Sequence(remains);
+            Poll::Ready(Some(Err(err)))
         } else {
-            Poll::Ready(Some(Ok(decoded)))
+            Poll::Ready(None)
         }
     }
 }
@@ -91,12 +100,16 @@ fn decode_next<'a, R>(
     cx: &mut Context<'_>,
     buf: &'a mut [u8],
     s: usize,
-) -> Poll<Result<(String, usize)>>
+) -> Poll<Option<Result<(String, usize)>>>
 where
     R: AsyncRead,
 {
     debug_assert!(buf.len() > s);
     let n = ready!(reader.poll_read(cx, &mut buf[s..]))?;
+    // The upstream is closed
+    if n == 0 {
+        return Poll::Ready(None);
+    }
     let e = s + n;
     debug_assert!(buf.len() >= e);
     let result = match std::str::from_utf8(&buf[..e]) {
@@ -142,7 +155,7 @@ where
             }
         },
     };
-    Poll::Ready(result)
+    Poll::Ready(Some(result))
 }
 
 #[cfg(test)]
