@@ -1,6 +1,6 @@
 [package]
 name = "async-utf8-decoder"
-version = "0.2.3-alpha.0"
+version = "0.2.3"
 authors = ["Alisue <lambdalisue@hashnote.net>"]
 edition = "2018"
 
