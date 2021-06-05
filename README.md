@@ -1,4 +1,5 @@
 [![crates.io](https://img.shields.io/crates/v/async-utf8-decoder.svg)](https://crates.io/crates/async-utf8-decoder)
+[![dependency status](https://deps.rs/repo/github/lambdalisue/rs-async-utf8-decoder/status.svg)](https://deps.rs/repo/github/lambdalisue/rs-async-utf8-decoder)
 [![docs.rs](https://docs.rs/async-utf8-decoder/badge.svg)](https://docs.rs/async-utf8-decoder)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Build](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml)
