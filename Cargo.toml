@@ -26,3 +26,8 @@ futures = "0.3.13"
 futures-await-test = "0.3.0"
 futures-timer = "3.0.2"
 async-std = { version = "1.9.0", features = ["attributes"] }
+criterion = { version = "0.3", features = ["html_reports", "async_futures"] }
+
+[[bench]]
+name = "my_benchmark"
+harness = false

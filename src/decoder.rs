@@ -72,25 +72,26 @@ where
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<<Self as Stream>::Item>> {
-        let this = self.project();
-        let reader = this.reader;
-        let remains = *this.remains;
+        let mut this = self.project();
         let buf = this.buf;
-        if let Some(result) = ready!(decode_next(reader, cx, buf, remains)) {
-            let (decoded, remains) = result?;
-            *this.remains = remains;
-            if decoded.is_empty() {
-                cx.waker().wake_by_ref();
-                Poll::Pending
+        loop {
+            let remains = *this.remains;
+            let reader = this.reader.as_mut();
+            if let Some(result) = ready!(decode_next(reader, cx, buf, remains)) {
+                let (decoded, remains) = result?;
+                *this.remains = remains;
+                if decoded.is_empty() {
+                    continue;
+                } else {
+                    return Poll::Ready(Some(Ok(decoded)));
+                }
+            } else if remains > 0 {
+                let remains = buf[..remains].to_vec();
+                let err = DecodeError::IncompleteUtf8Sequence(remains);
+                return Poll::Ready(Some(Err(err)));
             } else {
-                Poll::Ready(Some(Ok(decoded)))
+                return Poll::Ready(None);
             }
-        } else if remains > 0 {
-            let remains = buf[..remains].to_vec();
-            let err = DecodeError::IncompleteUtf8Sequence(remains);
-            Poll::Ready(Some(Err(err)))
-        } else {
-            Poll::Ready(None)
         }
     }
 }
