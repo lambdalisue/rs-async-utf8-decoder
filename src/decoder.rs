@@ -77,20 +77,23 @@ where
         loop {
             let remains = *this.remains;
             let reader = this.reader.as_mut();
-            if let Some(result) = ready!(decode_next(reader, cx, buf, remains)) {
-                let (decoded, remains) = result?;
-                *this.remains = remains;
-                if decoded.is_empty() {
-                    continue;
-                } else {
+            match ready!(decode_next(reader, cx, buf, remains)) {
+                Some(Err(err)) => return Poll::Ready(Some(Err(err))),
+                Some(Ok((decoded, remains))) => {
+                    *this.remains = remains;
+                    if decoded.is_empty() {
+                        continue;
+                    }
                     return Poll::Ready(Some(Ok(decoded)));
                 }
-            } else if remains > 0 {
-                let remains = buf[..remains].to_vec();
-                let err = DecodeError::IncompleteUtf8Sequence(remains);
-                return Poll::Ready(Some(Err(err)));
-            } else {
-                return Poll::Ready(None);
+                None => {
+                    if remains > 0 {
+                        let remains = buf[..remains].to_vec();
+                        let err = DecodeError::IncompleteUtf8Sequence(remains);
+                        return Poll::Ready(Some(Err(err)));
+                    }
+                    return Poll::Ready(None);
+                }
             }
         }
     }
