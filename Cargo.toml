@@ -15,18 +15,18 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures-core = "0.3.13"
-futures-io = "0.3.13"
-pin-project-lite = "0.2.5"
-thiserror = "1.0.24"
+futures-core = "0.3.17"
+futures-io = "0.3.17"
+pin-project-lite = "0.2.7"
+thiserror = "1.0.29"
 
 [dev-dependencies]
-anyhow = "1.0.38"
-futures = "0.3.13"
+anyhow = "1.0.44"
+futures = "0.3.17"
 futures-await-test = "0.3.0"
 futures-timer = "3.0.2"
-async-std = { version = "1.9.0", features = ["attributes"] }
-criterion = { version = "0.3", features = ["html_reports", "async_futures"] }
+async-std = { version = "1.10.0", features = ["attributes"] }
+criterion = { version = "0.3.5", features = ["html_reports", "async_futures"] }
 
 [[bench]]
 name = "my_benchmark"
