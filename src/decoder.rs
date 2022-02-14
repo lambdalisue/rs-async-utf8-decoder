@@ -33,14 +33,11 @@ impl<R> Utf8Decoder<R> {
             MINIMUM_BUF_SIZE,
             capacity,
         );
-        unsafe {
-            let mut buffer = Vec::with_capacity(capacity);
-            buffer.set_len(capacity);
-            Self {
-                reader,
-                buf: buffer.into_boxed_slice(),
-                remains: 0,
-            }
+        let buffer = vec![0; capacity];
+        Self {
+            reader,
+            buf: buffer.into_boxed_slice(),
+            remains: 0,
         }
     }
 
