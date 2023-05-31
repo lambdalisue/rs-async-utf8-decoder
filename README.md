@@ -5,6 +5,7 @@
 [![Build](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/build.yml)
 [![Test](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/test.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/test.yml)
 [![Audit](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml/badge.svg)](https://github.com/lambdalisue/rs-async-utf8-decoder/actions/workflows/audit.yml)
+[![codecov](https://codecov.io/gh/lambdalisue/rs-async-utf8-decoder/branch/main/graph/badge.svg?token=ghor9fqplN)](https://codecov.io/gh/lambdalisue/rs-async-utf8-decoder)
 
 # async-utf8-decoder
 
@@ -33,7 +34,6 @@ tx.send(Ok(vec![150])).await?;
 assert_eq!("💖", timeout(decoder.next()).await?.unwrap()?);
 assert!(timeout(decoder.next()).await.is_err());
 ```
-
 
 # License
 
