@@ -1,13 +1,18 @@
 name: Test
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -27,13 +32,13 @@ jobs:
           cargo fmt --version
       - name: Format
         run: |
-          cargo fmt && git diff --exit-code
+          cargo fmt --check
 
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -63,8 +68,8 @@ jobs:
       RUNNER: ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -87,8 +92,8 @@ jobs:
         run: |
           cargo llvm-cov --all-features --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
-          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info,lcov.use-gauge-on-cpu-seconds-total.info
           env_vars: RUNNER
-          fail_ci_if_error: true
