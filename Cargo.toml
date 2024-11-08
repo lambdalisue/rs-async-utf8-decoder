@@ -18,7 +18,7 @@ exclude = [
 futures-core = "0.3.21"
 futures-io = "0.3.21"
 pin-project-lite = "0.2.8"
-thiserror = "1.0.30"
+thiserror = "2.0.0"
 
 [dev-dependencies]
 anyhow = "1.0.53"
